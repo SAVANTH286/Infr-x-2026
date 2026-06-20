@@ -11,3 +11,18 @@ __MACOSX/
 # Temporary files
 ~$*
 *.tmp
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Local uploads and cache directories
+backend/uploads/
+
+# Archive files
+*.zip
+*.tar
+*.gz
+*.rar
+
+
