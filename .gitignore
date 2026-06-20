@@ -25,4 +25,10 @@ backend/uploads/
 *.gz
 *.rar
 
+# Environment variables
+.env
+.env.*
+*.env
+
+
 

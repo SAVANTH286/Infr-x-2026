@@ -17,12 +17,16 @@ interface Summary {
   health_breakdown: Record<string, number>;
   doc_instances: DocInstance[];
   truth_matrix: Record<string, Record<string, any>>;
+  evidence_count?: number;
+  evidence_types?: Record<string, number>;
 }
 
 interface Evidence {
+  evidence_id?: string;
   page_index: number;
   bbox: [number, number, number, number];
   doc_type: string;
+  content_preview?: string;
 }
 
 interface ChatMessage {
@@ -74,14 +78,13 @@ function LazyPdfPage({ pageIndex, activeHighlight, onRef }: LazyPdfPageProps) {
         width: '100%', 
         maxWidth: '612px', 
         background: '#1e293b', 
-        border: '1px solid var(--border-color)', 
         display: 'flex', 
         alignItems: 'center', 
         justifyContent: 'center',
         margin: '0 auto'
       }}
     >
-      <div style={{ position: 'absolute', top: '-24px', left: '0', fontSize: '11px', color: 'var(--text-secondary)' }}>
+      <div className="pdf-page-label">
         Page {pageIndex + 1}
       </div>
       
@@ -112,7 +115,7 @@ function LazyPdfPage({ pageIndex, activeHighlight, onRef }: LazyPdfPageProps) {
           })}
         </>
       ) : (
-        <div style={{ color: 'var(--text-secondary)', fontSize: '14px', fontStyle: 'italic' }}>
+        <div style={{ color: 'var(--text-muted)', fontSize: '14px', fontStyle: 'italic' }}>
           Loading Page {pageIndex + 1}...
         </div>
       )}
@@ -121,7 +124,8 @@ function LazyPdfPage({ pageIndex, activeHighlight, onRef }: LazyPdfPageProps) {
 }
 
 export default function App() {
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('grok_api_key') || '');
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('groq_api_key') || '');
+  const [geminiKey, setGeminiKey] = useState<string>(() => localStorage.getItem('gemini_api_key') || '');
   const [file, setFile] = useState<File | null>(null);
   const [summary, setSummary] = useState<Summary | null>(null);
   const [activeHighlight, setActiveHighlight] = useState<Evidence[] | null>(null);
@@ -138,8 +142,19 @@ export default function App() {
   const viewerContainerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    localStorage.setItem('grok_api_key', apiKey);
+    localStorage.setItem('groq_api_key', apiKey);
   }, [apiKey]);
+
+  useEffect(() => {
+    localStorage.setItem('gemini_api_key', geminiKey);
+  }, [geminiKey]);
+
+  const apiHeaders = (): Record<string, string> => {
+    const headers: Record<string, string> = {};
+    if (apiKey) headers['x-api-key'] = apiKey;
+    if (geminiKey) headers['x-gemini-key'] = geminiKey;
+    return headers;
+  };
 
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const uploadedFile = e.target.files?.[0];
@@ -156,9 +171,7 @@ export default function App() {
     try {
       const res = await fetch('http://localhost:8000/api/upload', {
         method: 'POST',
-        headers: {
-          'x-api-key': apiKey
-        },
+        headers: apiHeaders(),
         body: formData
       });
       if (!res.ok) throw new Error('Upload failed');
@@ -190,7 +203,7 @@ export default function App() {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-api-key': apiKey
+          ...apiHeaders()
         },
         body: JSON.stringify({ question: queryText })
       });
@@ -246,16 +259,8 @@ export default function App() {
           </div>
         </div>
         <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-          <input 
-            type="password" 
-            placeholder="Grok API Key (Optional / Free agent completions)" 
-            className="qa-input"
-            value={apiKey}
-            onChange={e => setApiKey(e.target.value)}
-            style={{ width: '320px', fontSize: '11px', height: '34px' }}
-          />
           {file && (
-            <button className="btn-back" style={{ height: '34px' }} onClick={() => { setFile(null); setSummary(null); }}>
+            <button className="btn-back" onClick={() => { setFile(null); setSummary(null); }}>
               Upload New PDF
             </button>
           )}
@@ -265,12 +270,12 @@ export default function App() {
       {/* Dynamic workspace area */}
       {!file ? (
         // FILE UPLOADER VIEW
-        <div style={{ display: 'flex', flexGrow: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <div className="glass-panel" style={{ padding: '60px', width: '500px', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-            <div style={{ fontSize: '64px' }}>📄</div>
-            <h2>Upload a PDF Document</h2>
-            <p style={{ color: 'var(--text-secondary)', fontSize: '13px' }}>
-              Drag and drop any PDF file. The Generic Analyzer will classify logical spans, extract metadata properties, and reconcile variables dynamically using Grok.
+        <div className="upload-hero">
+          <div className="glass-panel upload-card">
+            <div className="upload-icon-wrapper">📄</div>
+            <h2 className="upload-title">Upload a PDF Document</h2>
+            <p className="upload-desc">
+              Upload any PDF. PageVerdict extracts text, tables, checkboxes, images, and charts — then answers questions with traceable evidence citations.
             </p>
             <input 
               type="file" 
@@ -281,8 +286,7 @@ export default function App() {
             />
             <label 
               htmlFor="pdf-upload-input" 
-              className="qa-send-btn" 
-              style={{ padding: '12px 24px', cursor: 'pointer', display: 'inline-block' }}
+              className="upload-btn-label"
             >
               {isUploading ? 'Analyzing Document structure...' : 'Select PDF File'}
             </label>
@@ -295,7 +299,9 @@ export default function App() {
           <div className="sidebar-panel">
             {summary && (
               <div className="document-tree glass-panel">
-                <div className="tree-header">Logical Pagination Spans</div>
+                <div className="tree-header">
+                  <span>Logical Pagination Spans</span>
+                </div>
                 <ul className="tree-list">
                   {summary.doc_instances.map(doc => (
                     <li 
@@ -312,17 +318,17 @@ export default function App() {
             )}
             
             {summary && (
-              <div className="glass-panel" style={{ padding: '16px', overflowY: 'auto', flexGrow: 1 }}>
-                <div className="tree-header" style={{ marginBottom: '10px' }}>Extracted File Metadata</div>
+              <div className="glass-panel metadata-panel">
+                <div className="tree-header">Extracted File Metadata</div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
                   {summary.doc_instances.map(doc => (
                     Object.keys(doc.metadata).length > 0 && (
-                      <div key={doc.id} style={{ borderBottom: '1px solid var(--border-color)', paddingBottom: '8px' }}>
-                        <div style={{ fontSize: '11px', color: 'var(--accent-cyan)', fontWeight: 'bold' }}>{doc.label}</div>
+                      <div key={doc.id} className="meta-group">
+                        <div className="meta-group-title">{doc.label}</div>
                         {Object.entries(doc.metadata).map(([k, v]) => (
-                          <div key={k} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '4px' }}>
-                            <span style={{ color: 'var(--text-secondary)' }}>{k.replace('_', ' ')}:</span>
-                            <span style={{ fontWeight: '500' }}>{String(v)}</span>
+                          <div key={k} className="meta-row">
+                            <span className="meta-label">{k.replace('_', ' ')}:</span>
+                            <span className="meta-value">{String(v)}</span>
                           </div>
                         ))}
                       </div>
@@ -338,7 +344,7 @@ export default function App() {
             {/* Dynamic Truth Matrix table if overlapping keys exist */}
             {summary && Object.keys(summary.truth_matrix).length > 0 && (
               <div className="matrix-container glass-panel">
-                <div style={{ fontSize: '11px', textTransform: 'uppercase', color: 'var(--text-secondary)', marginBottom: '8px', fontWeight: 'bold' }}>
+                <div className="tree-header">
                   Dynamic Truth Matrix (Overlapping Keys)
                 </div>
                 <table className="matrix-table">
@@ -377,9 +383,9 @@ export default function App() {
             <div className="pdf-container glass-panel">
               <div className="pdf-toolbar">
                 <span>PDF Package Document Viewer</span>
-                <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{summary?.total_pages || 1} pages</span>
+                <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>{summary?.total_pages || 1} pages</span>
               </div>
-              <div className="pdf-viewport" ref={viewerContainerRef} style={{ display: 'flex', flexDirection: 'column', gap: '40px', overflowY: 'auto', alignItems: 'center', padding: '30px 20px' }}>
+              <div className="pdf-viewport" ref={viewerContainerRef}>
                 {summary && Array.from({ length: summary.total_pages }).map((_, idx) => (
                   <LazyPdfPage 
                     key={idx}
@@ -395,15 +401,15 @@ export default function App() {
           {/* RIGHT PANEL: Agent Chat Console */}
           <div className="qa-panel glass-panel">
             <div className="qa-header">
-              <h3 style={{ fontSize: '15px', fontWeight: 'bold' }}>Agent Truth Engine</h3>
-              <div style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
-                Grok agent analyzes page texts for direct answers.
+              <h3>Agent Truth Engine</h3>
+              <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
+                Groq QA engine with evidence store ({summary?.evidence_count ?? 0} items extracted).
               </div>
             </div>
 
             <div className="qa-conversation">
               {chatLog.length === 0 && (
-                <div style={{ color: 'var(--text-secondary)', textAlign: 'center', marginTop: '40px', fontSize: '13px' }}>
+                <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px', fontSize: '13px' }}>
                   <p>Ask any question about the uploaded document package. If evidence does not exist, the Answerability Agent will refuse to answer.</p>
                 </div>
               )}
@@ -424,17 +430,25 @@ export default function App() {
                     </div>
                   )}
 
-                  {/* Supporting Evidence Clickable Badges */}
+                  {/* Supporting Evidence Citations */}
                   {msg.evidence && msg.evidence.length > 0 && (
                     <div className="evidence-trail">
-                      <strong>Supporting Evidence Citations:</strong>
+                      <div className="evidence-trail-title">Supporting Evidence Citations</div>
                       {msg.evidence.map((ev, idx) => (
                         <div 
                           key={idx} 
-                          className="evidence-item"
+                          className="citation-card"
                           onClick={() => handleEvidenceClick(ev)}
                         >
-                          Page {ev.page_index + 1} (Click to scroll)
+                          <div className="citation-meta">
+                            <span>PAGE {ev.page_index + 1}</span>
+                            <span>{String(ev.doc_type || 'text').toUpperCase()}</span>
+                          </div>
+                          {ev.content_preview && (
+                            <div className="citation-preview">
+                              "{ev.content_preview}"
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -442,8 +456,12 @@ export default function App() {
                 </div>
               ))}
               {isLoading && (
-                <div className="chat-bubble assistant" style={{ fontStyle: 'italic' }}>
-                  Grok Agent reasoning...
+                <div className="chat-bubble assistant">
+                  <div className="typing-loader">
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                    <span className="typing-dot"></span>
+                  </div>
                 </div>
               )}
             </div>
