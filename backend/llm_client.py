@@ -40,6 +40,35 @@ class LLMClient:
         self.gemini_key = gemini_key or os.environ.get("GEMINI_API_KEY", "")
         self.openai_key = openai_key or os.environ.get("OPENAI_API_KEY", "")
 
+    def has_llm(self) -> bool:
+        return bool(self.gemini_key or self.groq_key or self.openai_key)
+
+    def complete_text(self, system: str, user: str) -> str:
+        """Prefer Gemini (free tier), then Groq if a key is present."""
+        text = self.gemini_text(system, user)
+        if text:
+            return text
+        return self.groq_text(system, user)
+
+    def gemini_text(self, system: str, user: str) -> str:
+        if not self.gemini_key:
+            return ""
+        payload = {
+            "system_instruction": {"parts": [{"text": system}]},
+            "contents": [{"parts": [{"text": user}]}],
+            "generationConfig": {"temperature": 0.1},
+        }
+        url = (
+            "https://generativelanguage.googleapis.com/v1beta/models/"
+            f"gemini-2.0-flash:generateContent?key={self.gemini_key}"
+        )
+        try:
+            data = _post_json(url, {"Content-Type": "application/json"}, payload, timeout=20)
+            return data["candidates"][0]["content"]["parts"][0]["text"]
+        except Exception as e:
+            print(f"Gemini text call failed: {e}")
+            return ""
+
     def groq_text(self, system: str, user: str, model: str = "llama-3.3-70b-versatile") -> str:
         if not self.groq_key:
             return ""
@@ -183,9 +212,8 @@ If nothing visual found, return []."""
             return []
 
     def classify_pages_batch(self, page_samples: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """Classify multiple pages in one Groq call."""
-        if not page_samples or not self.groq_key:
-            # Fallback early if key is missing
+        """Classify multiple pages with Gemini (free) or Groq."""
+        if not page_samples or not self.has_llm():
             return [
                 {
                     "page": s["page"],
@@ -206,7 +234,7 @@ If nothing visual found, return []."""
             "disclosure, credit_report, correspondence, id_document, general."
         )
         user = "Classify each page:\n\n" + "\n---\n".join(lines)
-        raw = self.groq_text(system, user)
+        raw = self.complete_text(system, user)
         try:
             parsed = json.loads(_clean_json(raw))
             if isinstance(parsed, list):
@@ -240,8 +268,13 @@ If nothing visual found, return []."""
                 system + "\n\n" + user + "\n\nReturn JSON only.",
                 images,
             )
+            if not raw:
+                raw = self.complete_text(system, user)
         else:
-            raw = self.groq_text(system, user)
+            raw = self.complete_text(system, user)
+
+        if not raw.strip():
+            return self._extractive_answer(question, evidence_context)
 
         try:
             parsed = json.loads(_clean_json(raw))
@@ -264,3 +297,27 @@ If nothing visual found, return []."""
             if any(p in lower for p in ["unavailable", "not found", "not in"]):
                 return {"answer": "unavailable", "cited_evidence_ids": [], "reasoning": text}
             return {"answer": text, "cited_evidence_ids": [], "reasoning": ""}
+
+    def _extractive_answer(self, question: str, evidence_context: str) -> Dict[str, Any]:
+        """No-key fallback: return the evidence snippets that overlap the question."""
+        words = {w.lower() for w in re.findall(r"[a-zA-Z0-9]{3,}", question)}
+        chunks = [c.strip() for c in re.split(r"\n{2,}", evidence_context or "") if c.strip()]
+        scored = []
+        for chunk in chunks:
+            chunk_words = {w.lower() for w in re.findall(r"[a-zA-Z0-9]{3,}", chunk)}
+            score = len(words & chunk_words)
+            if score:
+                scored.append((score, chunk))
+        scored.sort(reverse=True)
+        if not scored:
+            return {
+                "answer": "unavailable",
+                "cited_evidence_ids": [],
+                "reasoning": "No API key set and no overlapping evidence found.",
+            }
+        top = [chunk for _, chunk in scored[:3]]
+        return {
+            "answer": "\n\n".join(top)[:1200],
+            "cited_evidence_ids": [],
+            "reasoning": "Answered from extracted PDF text without an LLM key.",
+        }

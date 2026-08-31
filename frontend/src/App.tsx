@@ -407,7 +407,7 @@ export default function App() {
             <div className="qa-header">
               <h3>Agent Truth Engine</h3>
               <div style={{ fontSize: '11px', color: 'var(--text-muted)', marginTop: '4px' }}>
-                Groq QA engine with evidence store ({summary?.evidence_count ?? 0} items extracted).
+                Free Gemini QA engine with evidence store ({summary?.evidence_count ?? 0} items extracted).
               </div>
             </div>
 

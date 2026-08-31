@@ -30,10 +30,12 @@ Vite proxies `/api` to the backend, so you do **not** hardcode `localhost:8000`.
 Optional: put keys in `backend/.env`
 
 ```
-GROQ_API_KEY=...
 GEMINI_API_KEY=...
+GROQ_API_KEY=...
 OPENAI_API_KEY=...
 ```
+
+`GEMINI_API_KEY` is the free default. Get it at [https://aistudio.google.com/apikey](https://aistudio.google.com/apikey). Groq is optional. The app can still extract PDF text with no key.
 
 Or paste them in the UI (stored in the browser).
 
@@ -43,7 +45,7 @@ Or paste them in the UI (stored in the browser).
 
 1. Open that button (or [this deploy link](https://render.com/deploy?repo=https://github.com/SAVANTH286/Infr-x-2026)).
 2. Sign in with GitHub.
-3. Add `GROQ_API_KEY` if you want Q&A (optional).
+3. Add a free `GEMINI_API_KEY` from [Google AI Studio](https://aistudio.google.com/apikey) if you want LLM Q&A. Groq is no longer required.
 4. Click **Apply**.
 
 Render builds the Docker image and gives a public URL, usually:
@@ -59,8 +61,8 @@ The first free-tier boot can take 1–2 minutes.
 3. Use the Docker runtime (this repo has a `Dockerfile`).
 4. Environment variables (optional but needed for Q&A):
 
-   - `GROQ_API_KEY`
-   - `GEMINI_API_KEY` (optional)
+   - `GEMINI_API_KEY` (free — recommended)
+   - `GROQ_API_KEY` (optional)
    - `OPENAI_API_KEY` (optional)
 
 5. Click **Create Web Service**.
