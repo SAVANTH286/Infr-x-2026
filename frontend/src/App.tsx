@@ -1,5 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 
+// Empty in local Vite (uses the /api proxy). Set VITE_API_URL when the UI is hosted separately.
+const API_BASE = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
+const apiUrl = (path: string) => `${API_BASE}${path}`;
+
 interface DocInstance {
   id: string;
   type: string;
@@ -91,7 +95,7 @@ function LazyPdfPage({ pageIndex, activeHighlight, onRef }: LazyPdfPageProps) {
       {isVisible ? (
         <>
           <img 
-            src={`http://localhost:8000/api/page/${pageIndex}/render`} 
+            src={apiUrl(`/api/page/${pageIndex}/render`)} 
             alt={`Page ${pageIndex + 1}`}
             className="pdf-image"
             style={{ width: '100%', height: 'auto', display: 'block', background: 'white' }}
@@ -169,7 +173,7 @@ export default function App() {
     formData.append('file', uploadedFile);
 
     try {
-      const res = await fetch('http://localhost:8000/api/upload', {
+      const res = await fetch(apiUrl('/api/upload'), {
         method: 'POST',
         headers: apiHeaders(),
         body: formData
@@ -199,7 +203,7 @@ export default function App() {
     if (!customQ) setQuestion('');
 
     try {
-      const res = await fetch('http://localhost:8000/api/query', {
+      const res = await fetch(apiUrl('/api/query'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
