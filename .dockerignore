@@ -1,0 +1,9 @@
+.git
+**/node_modules
+frontend/dist
+**/__pycache__
+**/*.pyc
+loan-packages-dataset-final
+backend/uploads
+backend/.env
+.env

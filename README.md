@@ -37,33 +37,33 @@ OPENAI_API_KEY=...
 
 Or paste them in the UI (stored in the browser).
 
-## Deploy on Render (one service)
+## Deploy (one click)
 
-This is the simplest public deploy.
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/SAVANTH286/Infr-x-2026)
 
-1. Push this repo to GitHub (already at [SAVANTH286/Infr-x-2026](https://github.com/SAVANTH286/Infr-x-2026)).
-2. Open [https://dashboard.render.com](https://dashboard.render.com) and sign in with GitHub.
-3. **New → Web Service** → select `Infr-x-2026`.
-4. Settings:
+1. Open that button (or [this deploy link](https://render.com/deploy?repo=https://github.com/SAVANTH286/Infr-x-2026)).
+2. Sign in with GitHub.
+3. Add `GROQ_API_KEY` if you want Q&A (optional).
+4. Click **Apply**.
 
-   | Field | Value |
-   |---|---|
-   | Runtime | Python 3 |
-   | Build command | `cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt` |
-   | Start command | `cd backend && uvicorn main:app --host 0.0.0.0 --port $PORT` |
-   | Instance | Free
+Render builds the Docker image and gives a public URL, usually:
 
-5. Environment variables (optional but needed for Q&A):
+`https://infr-x-2026.onrender.com`
+
+The first free-tier boot can take 1–2 minutes.
+
+## Deploy on Render (manual)
+
+1. Open [https://dashboard.render.com](https://dashboard.render.com) and sign in with GitHub.
+2. **New → Web Service** → select `Infr-x-2026`.
+3. Use the Docker runtime (this repo has a `Dockerfile`).
+4. Environment variables (optional but needed for Q&A):
 
    - `GROQ_API_KEY`
    - `GEMINI_API_KEY` (optional)
    - `OPENAI_API_KEY` (optional)
 
-6. Click **Create Web Service**.
-
-Render gives a URL like:
-
-`https://infr-x-2026.onrender.com`
+5. Click **Create Web Service**.
 
 The backend also serves the built frontend from `frontend/dist`, so that one URL is the full app.
 
